@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Did You Get the Level You Asked For? · Interactive demo</title>
+<meta name="description" content="Ask for a Super Mario Bros. level in plain English, watch a reinforcement-learning policy compose and edit it, then play it. Interactive demo of an AIIDE 2026 paper.">
+<meta property="og:title" content="Did You Get the Level You Asked For? · Interactive demo">
+<meta property="og:description" content="Ask for a Mario level in plain English, watch an RL policy build it, then play it (AIIDE 2026).">
+<meta property="og:image" content="assets/og.png">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" href="assets/favicon-180.png">
+<meta name="theme-color" content="#11142A">
+<link rel="stylesheet" href="assets/fonts.css">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand"><img src="assets/sprites/question_block_coin.png" alt="">intent·pcgrl</div>
+  <nav class="nav"><a href="#how">How it works</a><a href="https://github.com/brunolemosdl/intent-pcgrl">Code</a><a href="assets/poster.pdf">Poster</a></nav>
+</div></header>
+
+<main class="wrap">
+  <section class="hero">
+    <div class="kicker">Interactive demo · AIIDE 2026</div>
+    <h1>Did you get the level <span>you asked for?</span></h1>
+    <p>Ask for a <i>Super Mario Bros.</i> level in plain English. A language model turns it into eight numbers, a reinforcement-learning policy builds the level from pieces of real Mario levels and then edits it until the numbers match, and you get to play the result.</p>
+    <div class="steps"><span><b>1</b>Ask</span><span><b>2</b>Watch it build</span><span><b>3</b>Play it</span></div>
+  </section>
+
+  <div class="grid">
+    <!-- 1 · ASK -->
+    <section class="card" id="ask">
+      <h2><span class="n">1</span>Ask for a level</h2>
+      <p class="sub">In words, or tune the eight numbers yourself.</p>
+      <div class="tabs" role="tablist">
+        <button class="on" data-tab="words" role="tab">In words</button>
+        <button data-tab="numbers" role="tab">In numbers</button>
+      </div>
+
+      <div data-pane="words">
+        <form class="ask-box" id="askForm">
+          <input id="askInput" autocomplete="off" placeholder="e.g. a flat, easy level with many coins" aria-label="Describe a level">
+          <button class="btn" type="submit">Generate</button>
+        </form>
+        <div class="chips" id="chips"></div>
+        <div class="match" id="match" hidden></div>
+        <div class="translation">
+          <div class="lbl">GPT-5.2 translation · recorded</div>
+          <div class="vbars" id="askBars"></div>
+          <div class="rationale" id="rationale"></div>
+        </div>
+      </div>
+
+      <div data-pane="numbers" hidden>
+        <div class="sliders" id="sliders"></div>
+        <div class="presets" id="presets"></div>
+        <button class="btn" id="numGo" style="width:100%;margin-top:16px">Generate</button>
+        <div class="match" id="numMatch" hidden></div>
+      </div>
+    </section>
+
+    <!-- 2 · BUILD -->
+    <section class="card" id="build">
+      <div class="build-head">
+        <div>
+          <h2><span class="n">2</span>Watch it build</h2>
+          <div class="req placeholder" id="req">Pick a request on the left.</div>
+        </div>
+        <div class="status">
+          <span class="pill" id="phase" style="color:var(--ink3)">ready</span>
+          <div class="errbox"><div class="lbl">distance from request</div><div class="num" id="err">—</div></div>
+        </div>
+      </div>
+      <div class="level-wrap"><canvas class="level" id="levelCv" aria-label="The level being built"></canvas></div>
+      <div class="op" id="op"></div>
+      <div class="ctrl">
+        <button class="btn ghost" id="replay">↻ Replay</button>
+        <input type="range" id="scrub" min="0" max="0" value="0" aria-label="Episode step">
+        <span class="mono" id="stepLbl">0 / 0</span>
+      </div>
+      <div class="gauges" id="gauges"></div>
+      <div class="legend"><span><i class="lt"></i>target</span><span><i class="lm"></i>measured</span><span><i class="lo"></i>within 0.05</span></div>
+    </section>
+  </div>
+
+  <!-- 3 · PLAY -->
+  <section class="card play" id="play">
+    <h2><span class="n">3</span>Play it</h2>
+    <p class="sub">The level you just generated, in a simplified platformer. Every level here was also completed by the paper's A* agent.</p>
+    <div class="play-grid">
+      <div>
+        <div class="game-shell" id="gameShell">
+          <div class="game-wrap" id="gameWrap" tabindex="0" aria-label="Game: use arrow keys and space">
+            <canvas class="game" id="gameCv"></canvas>
+            <div class="hud"><span id="hudCoins">COINS 0</span><span id="hudTime">TIME 0.0</span></div>
+            <div class="overlay" id="gameOverlay"><div><h3 id="ovTitle">Ready?</h3><p id="ovText">Generate a level, then press Play.</p><div class="actions"><button class="btn" id="ovBtn">Play</button><button class="btn ghost" id="ovExit">Exit full screen</button></div></div></div>
+            <button class="fs-btn" id="fsBtn" aria-label="Full screen" title="Full screen (F)"><svg viewBox="0 0 16 16" aria-hidden="true"><path class="enter" d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/><path class="leave" d="M6 2v4H2M10 2v4h4M14 10h-4v4M2 10h4v4"/></svg></button>
+          </div>
+          <div class="touch" id="touch">
+            <div class="pad" id="pad" role="group" aria-label="Move left or right"><span><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M9 1v10L1 6z"/></svg></span><span><svg viewBox="0 0 10 12" aria-hidden="true"><path d="M1 1v10l8-5z"/></svg></span></div>
+            <button class="jump" id="jumpBtn" aria-label="Jump">JUMP</button>
+          </div>
+          <p class="rotate-hint">Turn the screen sideways for a bigger game.</p>
+        </div>
+      </div>
+      <div>
+        <div class="keys"><span class="kb"><kbd>←</kbd> <kbd>→</kbd> run · <kbd>Space</kbd> / <kbd>↑</kbd> jump (hold for higher) · <kbd>R</kbd> restart · <kbd>F</kbd> full screen<br></span><span class="tp">Play opens the game in full screen, with the controls on the screen.<br></span>Stomp goombas, collect coins, reach the flag.</div>
+        <div class="agent">
+          <button class="btn ghost" id="agentBtn" style="width:100%">▶&#xFE0E; Watch the A* agent play it</button>
+          <div class="screen" id="agentScreen" hidden><img id="agentImg" alt="A* agent playing the level"></div>
+          <div class="cap" id="agentCap"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how" id="how">
+    <div class="kicker">How it works</div>
+    <h2>The request becomes a numeric contract</h2>
+    <p>Language and level generation are kept apart: the language model only writes eight numbers, and a language-free policy builds and checks the level. That is why every miss can be traced to the translation, the generator, or conflicting targets.</p>
+    <div class="pipeline">
+      <div class="stage" style="--c:var(--indigo)"><div class="k">A · Language bridge</div><h3>Eight numbers</h3><p>GPT-5.2 maps the request to targets in [0, 1] for enemies, coins, blocks, pipes, gaps, verticality, smoothness and platforms. It never places a tile.</p></div>
+      <div class="stage" style="--c:var(--green)"><div class="k">B · Stitch</div><h3>Pieces of real levels</h3><p>A MaskablePPO policy stitches about ten of 264 pieces cut from the 15 original <i>Super Mario Bros.</i> levels (converted by the VGLC), joined only where Mario can jump across.</p></div>
+      <div class="stage" style="--c:var(--purple)"><div class="k">C · Safe edit</div><h3>Fix what the pieces can't</h3><p>The same policy applies edits (remove enemies, fill gaps, flatten terrain…). Any edit that breaks the level is undone.</p></div>
+      <div class="stage" style="--c:var(--gold)"><div class="k">D · Touch-up &amp; check</div><h3>Verified delivery</h3><p>A simple rule-based touch-up fixes what is left, and the A* game-playing bot must finish the level before it is released.</p></div>
+    </div>
+    <div class="results">
+      <div><b style="color:var(--green)">7×</b><span>faster than searching through piece combinations, with half the error</span></div>
+      <div><b>8/8</b><span>numbers can be set anywhere from 0 to 1, even exactly zero</span></div>
+      <div><b style="color:var(--gold)">−30%</b><span>error vs stitching alone, on requests the real levels cannot express</span></div>
+      <div><b style="color:var(--sky)">0.053</b><span>average gap between GPT-5.2's numbers and the right ones</span></div>
+    </div>
+    <div class="honest">
+      <div class="box"><h4>What is real here</h4><ul>
+        <li>Every level was generated by the released 10M-step policy (best of up to 64 runs, with or without the touch-up, whichever is closer to the request) and completed by the Mario AI Framework A* agent.</li>
+        <li>Only levels that match their request are shown: mean error at most 0.05, no number off by more than 0.15, and “none” really means none.</li>
+        <li>Every “In words” request uses a translation recorded from GPT-5.2, replayed exactly as in the paper.</li>
+        <li>The animation replays the real episode, decision by decision.</li>
+      </ul></div>
+      <div class="box"><h4>What this page simulates</h4><ul>
+        <li>No model runs in your browser: free text is matched to the closest recorded request.</li>
+        <li>“In numbers” shows the generated level whose target is closest to your sliders.</li>
+        <li>The playable game uses simplified physics, not the original engine.</li>
+      </ul></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap">
+  <div><b style="color:var(--ink2)">Did You Get the Level You Asked For? Bridging LLMs and PCGRL for Mario Level Generation</b><br>Bruno Lemos and Luiz Chaimowicz · Universidade Federal de Minas Gerais (UFMG) · AIIDE 2026</div>
+  <div><a href="https://github.com/brunolemosdl/intent-pcgrl">Code, models &amp; data</a> · <a href="https://github.com/brunolemosdl/intent-pcgrl-demo">Demo source</a> · <a href="assets/poster.pdf">Poster (PDF)</a></div>
+</div></footer>
+<div class="toast" id="toast"></div>
+<script type="module" src="assets/app.js"></script>
+</body>
+</html>
